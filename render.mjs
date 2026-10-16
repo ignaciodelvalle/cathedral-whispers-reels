@@ -62,7 +62,7 @@ function paginate(segments) {
 }
 
 // ---------- drawing ----------
-const shadow = '0 2px 18px rgba(0,0,0,0.55)';
+const shadow = '0 2px 6px rgba(0,0,0,0.65), 0 0 30px rgba(0,0,0,0.6)';
 
 function pageTree(segs, size, visible) {
   return {
@@ -119,7 +119,7 @@ function shadeTree() {
   return {
     type: 'div',
     props: { style: { width: W, height: H, display: 'flex',
-      backgroundImage: 'linear-gradient(180deg, rgba(8,6,4,0.62) 0%, rgba(8,6,4,0.40) 18%, rgba(8,6,4,0.46) 45%, rgba(8,6,4,0.58) 70%, rgba(8,6,4,0.82) 100%)' } },
+      backgroundImage: 'radial-gradient(ellipse 620px 760px at 50% 46%, rgba(8,6,4,0.38) 0%, rgba(8,6,4,0.22) 55%, rgba(8,6,4,0) 100%), linear-gradient(180deg, rgba(8,6,4,0.70) 0%, rgba(8,6,4,0.46) 17%, rgba(8,6,4,0.50) 45%, rgba(8,6,4,0.62) 72%, rgba(8,6,4,0.86) 100%)' } },
   };
 }
 
@@ -257,18 +257,18 @@ export async function renderReel(job, out, opts = {}) {
   f.push(`[${audioIdx}:a]atrim=0:${tl.total.toFixed(2)},afade=t=in:st=0:d=1.2,afade=t=out:st=${fadeOut.toFixed(2)}:d=2.8,aresample=48000[aout]`);
 
   args.push('-filter_complex', f.join(';'), '-map', '[vout]', '-map', '[aout]',
-    '-c:v', 'libx264', '-preset', opts.preset ?? 'medium', '-crf', '20', '-profile:v', 'high', '-r', String(FPS),
+    '-c:v', 'libx264', '-preset', opts.preset ?? 'medium', '-crf', '23', '-maxrate', '4500k', '-bufsize', '9000k', '-profile:v', 'high', '-r', String(FPS),
     '-g', String(FPS * 2), '-keyint_min', String(FPS * 2), '-sc_threshold', '0',
     '-c:a', 'aac', '-b:a', '128k', '-ar', '48000', '-ac', '2',
     '-t', tl.total.toFixed(2), '-movflags', '+faststart', out);
-  execFileSync('ffmpeg', args, { stdio: 'inherit' });
+  if (!opts.posterOnly) execFileSync('ffmpeg', args, { stdio: 'inherit' });
 
   // poster: the first page fully revealed (for the review page thumbnail)
   let poster = null;
   if (opts.poster) {
     const p1 = await png(pageTree(pages[0], size, pages[0].map((_, i) => i)), path.join(dir, 'p1.png'));
     execFileSync('ffmpeg', ['-y', '-loglevel', 'error', '-i', photo, '-i', shade.file, '-i', label.file, '-i', p1.file,
-      '-filter_complex', `[0:v]scale=${W}:${H}:force_original_aspect_ratio=increase,crop=${W}:${H}[b];[b][1:v]overlay[x];[x][2:v]overlay[y];[y][3:v]overlay,scale=360:640`,
+      '-filter_complex', `[0:v]scale=${W}:${H}:force_original_aspect_ratio=increase,crop=${W}:${H}[b];[b][1:v]overlay[x];[x][2:v]overlay[y];[y][3:v]overlay,scale=${opts.posterOnly ? '540:960' : '360:640'}`,
       '-frames:v', '1', '-q:v', '5', opts.poster]);
     poster = opts.poster;
   }
@@ -280,6 +280,6 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   const arg = (k) => { const i = process.argv.indexOf(k); return i > 0 ? process.argv[i + 1] : undefined; };
   const job = JSON.parse(fs.readFileSync(arg('--job'), 'utf8'));
   const t0 = Date.now();
-  const res = await renderReel(job, arg('--out') ?? 'out.mp4', { photo: arg('--photo'), poster: arg('--poster'), preset: arg('--preset') });
+  const res = await renderReel(job, arg('--out') ?? 'out.mp4', { photo: arg('--photo'), poster: arg('--poster'), preset: arg('--preset'), posterOnly: process.argv.includes('--poster-only') });
   console.log(JSON.stringify({ ...res, seconds: (Date.now() - t0) / 1000 }));
 }
