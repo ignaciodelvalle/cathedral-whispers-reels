@@ -1,0 +1,33 @@
+name: Render Reels
+
+on:
+  schedule:
+    - cron: '23 */2 * * *'     # every 2 hours; renders Reels scheduled in the next 4 days
+  workflow_dispatch: {}
+  push:
+    branches: [main]
+    paths: ['render.mjs', 'worker.mjs', 'audio/**', 'fonts/**', '.github/workflows/render.yml']
+
+permissions:
+  id-token: write     # GitHub OIDC token = our only credential (verified by the reels-api function)
+  contents: read
+
+concurrency:
+  group: render-reels
+  cancel-in-progress: false
+
+jobs:
+  render:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install ffmpeg
+        run: command -v ffmpeg || (sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg)
+      - run: npm ci --no-audit --no-fund
+      - name: Render pending Reels
+        run: node worker.mjs
