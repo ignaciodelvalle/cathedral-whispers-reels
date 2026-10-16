@@ -10,7 +10,7 @@ on:
 
 permissions:
   id-token: write     # GitHub OIDC token = our only credential (verified by the reels-api function)
-  contents: read
+  contents: write     # only for the weekly keep-alive commit below
 
 concurrency:
   group: render-reels
@@ -18,7 +18,7 @@ concurrency:
 
 jobs:
   render:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
@@ -31,3 +31,14 @@ jobs:
       - run: npm ci --no-audit --no-fund
       - name: Render pending Reels
         run: node worker.mjs
+      # GitHub switches off scheduled workflows in public repos after 60 days without commits,
+      # so the first scheduled run each Monday leaves a one-line heartbeat commit.
+      - name: Keep-alive heartbeat
+        if: github.event_name == 'schedule' && always()
+        run: |
+          if [ "$(date -u +%u)" = "1" ] && [ "$(date -u +%H)" -lt 2 ]; then
+            date -u +%FT%TZ > .heartbeat
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add .heartbeat && git commit -m "heartbeat" && git push
+          fi
