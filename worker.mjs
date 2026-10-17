@@ -48,7 +48,7 @@ for (const job of jobs) {
     console.log(`rendering ${job.label} (${job.id})`);
     const res = await renderReel(job, out, { poster });
     const size = fs.statSync(out).size;
-    console.log(`  ${res.duration}s, ${(size / 1e6).toFixed(1)} MB, ${res.pages} page(s) at ${res.size}px`);
+    console.log(`  ${res.format ?? 'passage'}: ${res.duration}s, ${(size / 1e6).toFixed(1)} MB, ${res.pages} page(s)${res.size ? ` at ${res.size}px` : ''}`);
     const up = await api('upload-url', { id: job.id });
     const put = await fetch(up.url, {
       method: 'PUT',
